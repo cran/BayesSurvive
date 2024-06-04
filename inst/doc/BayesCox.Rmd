@@ -1,12 +1,16 @@
-[![CRAN](http://www.r-pkg.org/badges/version/BayesSurvive)](https://cran.r-project.org/package=BayesSurvive)
-[![r-universe](https://ocbe-uio.r-universe.dev/badges/BayesSurvive)](https://ocbe-uio.r-universe.dev/BayesSurvive)
-[![R-CMD-check](https://github.com/ocbe-uio/BayesSurvive/workflows/R-CMD-check/badge.svg)](https://github.com/ocbe-uio/BayesSurvive/actions)
-[![License](https://img.shields.io/badge/License-GPLv3-brightgreen.svg)](https://www.gnu.org/licenses/gpl-3.0)
+---
+title: "Bayesian Cox Models with graph-structure priors"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{Bayesian Cox Models with graph-structure priors}
+  \usepackage[utf8]{inputenc}
+---
 
-
-# BayesSurvive
-
-
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+options(rmarkdown.html_vignette.check_title = FALSE)
+```
 
 This is a R/Rcpp package **BayesSurvive** for Bayesian survival models with graph-structured selection priors for sparse identification of high-dimensional features predictive of survival ([Madjar et al., 2021](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-021-04483-z)) and its extensions with the use of a fixed graph via a Markov Random Field (MRF) prior for capturing known structure of high-dimensional features, e.g. disease-specific pathways from the Kyoto Encyclopedia of Genes and Genomes (KEGG) database.
 
@@ -71,7 +75,7 @@ plot(fit) +
 #simData[[1]]$trueB
 ```
 
-<img src="man/figures/README_plot_beta.png" width="100%" />
+<img src="../man/figures/README_plot_beta.png" width="100%" />
 
 
 ### Plot time-dependent Brier scores
@@ -82,7 +86,7 @@ The function `BayesSurvive::plotBrier()` can show the time-dependent Brier score
 plotBrier(fit, , survObj.new = dataset)
 ```
 
-<img src="man/figures/README_plot_brier.png" width="50%" />
+<img src="../man/figures/README_plot_brier.png" width="70%" />
 
 The integrated Brier score (IBS) can be obtained by the function `BayesSurvive::predict()`.
 
