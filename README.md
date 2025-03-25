@@ -1,14 +1,20 @@
-[![CRAN](http://www.r-pkg.org/badges/version/BayesSurvive)](https://cran.r-project.org/package=BayesSurvive)
+# BayesSurvive
+
+[![CRAN
+status](https://www.r-pkg.org/badges/version/BayesSurvive)](https://cran.r-project.org/package=BayesSurvive)
 [![r-universe](https://ocbe-uio.r-universe.dev/badges/BayesSurvive)](https://ocbe-uio.r-universe.dev/BayesSurvive)
 [![R-CMD-check](https://github.com/ocbe-uio/BayesSurvive/workflows/R-CMD-check/badge.svg)](https://github.com/ocbe-uio/BayesSurvive/actions)
 [![License](https://img.shields.io/badge/License-GPLv3-brightgreen.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![DOI](https://img.shields.io/badge/doi-10.32614%2FCRAN.package.BayesSurvive-brightgreen)](https://doi.org/10.32614/CRAN.package.BayesSurvive)
 
 
-# BayesSurvive
+This is a R/Rcpp package **BayesSurvive** for Bayesian survival models with graph-structured selection priors for sparse identification of high-dimensional features predictive of survival ([Hermansen et al., 2025](https://doi.org/10.48550/arXiv.2503.13078); [Madjar et al., 2021](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-021-04483-z)) (see the three models of the first column in the table below) and its extensions with the use of a fixed graph via a Markov Random Field (MRF) prior for capturing known structure of high-dimensional features (see the three models of the second column in the table below), e.g. disease-specific pathways from the Kyoto Encyclopedia of Genes and Genomes (KEGG) database.
 
-
-
-This is a R/Rcpp package **BayesSurvive** for Bayesian survival models with graph-structured selection priors for sparse identification of high-dimensional features predictive of survival ([Madjar et al., 2021](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-021-04483-z)) and its extensions with the use of a fixed graph via a Markov Random Field (MRF) prior for capturing known structure of high-dimensional features, e.g. disease-specific pathways from the Kyoto Encyclopedia of Genes and Genomes (KEGG) database.
+Model        | Infer `MRF_G` | Fix `MRF_G`
+------------:| --------------|---------------
+`Pooled`     |        ✔      |           ✔          
+`CoxBVSSL`   |        ✔      |           ✔          
+`Sub-struct` |        ✔      |           ✔          
 
 ## Installation
 
@@ -56,43 +62,48 @@ hyperparPooled = list(
 )   
 
 ## run Bayesian Cox with graph-structured priors
+set.seed(123)
 fit <- BayesSurvive(survObj = dataset, model.type = "Pooled", MRF.G = TRUE, 
-                    hyperpar = hyperparPooled, initial = initial, nIter = 100)
+                    hyperpar = hyperparPooled, initial = initial, 
+                    nIter = 200, burnin = 100)
 
 ## show posterior mean of coefficients and 95% credible intervals
 library("GGally")
 plot(fit) + 
   coord_flip() + 
   theme(axis.text.x = element_text(angle = 90, size = 7))
-
-#plot(fit$output$beta.p[,1], type="l")
-#fit$output$beta.margin
-#fit$output$gamma.margin
-#simData[[1]]$trueB
 ```
 
-<img src="man/figures/README_plot_beta.png" width="100%" />
+<img src="man/figures/README_plot_beta.png" width="130%" />
 
+Show the index of selected variables by controlling Bayesian false discovery rate (FDR) at the level $\alpha = 0.05$
+
+```r
+which( VS(fit, method = "FDR", threshold = 0.05) )
+```
+```
+#[1]   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15 128
+```
 
 ### Plot time-dependent Brier scores
 
 The function `BayesSurvive::plotBrier()` can show the time-dependent Brier scores based on posterior mean of coefficients or Bayesian model averaging.
 
 ```r
-plotBrier(fit, , survObj.new = dataset)
+plotBrier(fit, survObj.new = dataset)
 ```
 
 <img src="man/figures/README_plot_brier.png" width="50%" />
 
-The integrated Brier score (IBS) can be obtained by the function `BayesSurvive::predict()`.
+We can also use the function `BayesSurvive::predict()` to obtain the Brier score at time 8.5, the integrated Brier score (IBS) from time 0 to 8.5 and the index of prediction accuracy (IPA).
 
 ```r
-predict(fit, survObj.new = dataset)
+predict(fit, survObj.new = dataset, times = 8.5)
 ```
 ```{ .text .no-copy }
-##                     IBS
-## Null model          0.09147208
-## Bayesian Cox model  0.03433363
+##               Brier(t=8.5) IBS(t:0~8.5) IPA(t=8.5)
+## Null.model      0.2290318   0.08185316  0.0000000
+## Bayesian.Cox    0.1037802   0.03020026  0.5468741
 ```
 
 ### Predict survival probabilities and cumulative hazards
@@ -103,19 +114,19 @@ The function `BayesSurvive::predict()` can estimate the survival probabilities a
 predict(fit, survObj.new = dataset, type = c("cumhazard", "survival"))
 ```
 ```{ .text .no-copy }
-##        observation times cumhazard survival
-##              <int> <num>     <num>    <num>
-##     1:           1   3.3  2.11e-04 1.00e+00
-##     2:           2   3.3  3.29e-01 7.20e-01
-##     3:           3   3.3  2.06e-06 1.00e+00
-##     4:           4   3.3  1.19e-02 9.88e-01
-##     5:           5   3.3  5.36e-04 9.99e-01
-##   ---                                     
-##  9996:          96   9.5  2.67e+01 2.57e-12
-##  9997:          97   9.5  1.08e+03 0.00e+00
-##  9998:          98   9.5  2.23e+00 1.08e-01
-##  9999:          99   9.5  3.72e+00 2.42e-02
-## 10000:         100   9.5  3.37e+01 2.38e-15
+#        observation times cumhazard  survival
+##              <int> <num>     <num>     <num>
+##     1:           1   3.3  1.04e-04 1.00e+00
+##     2:           2   3.3  3.88e-01 6.78e-01
+##     3:           3   3.3  1.90e-06 1.00e+00
+##     4:           4   3.3  1.94e-03 9.98e-01
+##     5:           5   3.3  4.08e-04 1.00e+00
+##    ---                                     
+##  9996:          96   9.5  1.40e+01 8.21e-07
+##  9997:          97   9.5  8.25e+01 1.45e-36
+##  9998:          98   9.5  5.37e-01 5.85e-01
+##  9999:          99   9.5  2.00e+00 1.35e-01
+## 10000:         100   9.5  3.58e+00 2.79e-02
 ```
 
 ### Run a 'Pooled' Bayesian Cox model with graphical learning
@@ -149,6 +160,10 @@ fit4 <- BayesSurvive(survObj = dataset2,
 ```
 
 ## References
+
+> Tobias Østmo Hermansen, Manuela Zucknick, Zhi Zhao (2025).
+> Bayesian Cox model with graph-structured variable selection priors for multi-omics biomarker identification.
+> _arXiv_. DOI: [arXiv.2503.13078](https://doi.org/10.48550/arXiv.2503.13078).
 
 > Katrin Madjar, Manuela Zucknick, Katja Ickstadt, Jörg Rahnenführer (2021).
 > Combining heterogeneous subgroups with graph‐structured variable selection priors for Cox regression.

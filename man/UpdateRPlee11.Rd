@@ -4,10 +4,11 @@
 \alias{UpdateRPlee11}
 \title{Update coefficients of Bayesian Cox Models}
 \usage{
-UpdateRPlee11(sobj, hyperpar, ini, S, method, MRF_G)
+UpdateRPlee11(sobj, hyperpar, ini, S, method, MRF_G, cpp = FALSE)
 }
 \arguments{
-\item{sobj}{a list containing observed data}
+\item{sobj}{a list containing observed data from \code{n} subjects;
+\code{t}, \code{di}, \code{X}. See details for more information}
 
 \item{hyperpar}{a list containing prior parameter values}
 
@@ -20,7 +21,9 @@ UpdateRPlee11(sobj, hyperpar, ini, S, method, MRF_G)
 
 \item{MRF_G}{logical value. \code{MRF_G = TRUE} is to fix the MRF graph which
 is provided in the argument \code{hyperpar}, and \code{MRF_G = FALSE} is to
-use graphical model for leanring the MRF graph}
+use graphical model for learning the MRF graph}
+
+\item{cpp}{logical, whether to use C++ code for faster computation}
 }
 \value{
 A list object with component 'beta.ini' for the updated coefficients

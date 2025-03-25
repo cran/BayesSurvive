@@ -9,6 +9,7 @@
 #' @importFrom Rcpp evalCpp
 #' @importFrom survival survreg
 #' @importFrom stats runif
+#' @importFrom methods is
 #'
 #' @param survObj a list containing observed data from \code{n} subjects with
 #' components \code{t}, \code{di}, \code{X}. For graphical learning of the
@@ -22,10 +23,10 @@
 #' is the list of \code{t}, \code{di} and \code{X}
 #' @param MRF2b logical value. \code{MRF2b = TRUE} means two different
 #' hyperparameters b in MRF prior (values b01 and b02) and \code{MRF2b = FALSE}
-#' means one hyperparamter b in MRF prior
+#' means one hyperparameter b in MRF prior
 #' @param MRF.G logical value. \code{MRF.G = TRUE} is to fix the MRF graph which
 #' is provided in the argument \code{hyperpar}, and \code{MRF.G = FALSE} is to
-#' use graphical model for leanring the MRF graph
+#' use graphical model for learning the MRF graph
 #' @param g.ini initial values for latent edge inclusion indicators in graph,
 #' should be a value in [0,1]. 0 or 1: set all random edges to 0 or 1; value in
 #' (0,1): rate of indicators randomly set to 1, the remaining indicators are 0
@@ -38,7 +39,8 @@
 #' @param output_graph_para allow (\code{TRUE}) or suppress (\code{FALSE}) the
 #' output for parameters 'G', 'V', 'C' and 'Sig' in the graphical model
 #' if \code{MRF.G = FALSE}
-#' @param verbose logical value to display the progess of MCMC
+#' @param verbose logical value to display the progress of MCMC
+#' @param cpp logical, whether to use C++ code for faster computation
 #'
 #'
 #' @return An object of class \code{BayesSurvive} is saved as
@@ -86,7 +88,7 @@
 #' # run Bayesian Cox with graph-structured priors
 #' fit <- BayesSurvive(
 #'   survObj = dataset, hyperpar = hyperparPooled,
-#'   initial = initial, nIter = 100
+#'   initial = initial, nIter = 50
 #' )
 #'
 #' # show posterior mean of coefficients and 95% credible intervals
@@ -108,7 +110,11 @@ BayesSurvive <- function(survObj,
                          burnin = 0,
                          thin = 1,
                          output_graph_para = FALSE,
-                         verbose = TRUE) {
+                         verbose = TRUE,
+                         cpp = FALSE) {
+  # Validation
+  stopifnot(burnin < nIter)
+
   # same number of covariates p in all subgroups
   p <- ifelse(is.list(survObj[[1]]), NCOL(survObj[[1]]$X), NCOL(survObj$X))
   Beta.ini <- numeric(p)
@@ -177,7 +183,7 @@ BayesSurvive <- function(survObj,
   # check the formula
   cl <- match.call()
 
-  # set hyperparamters of all piors
+  # set hyperparameters of all piors
 
   if (model.type == "Sub-struct" && S > 1) {
     MRF2b <- TRUE
@@ -269,7 +275,7 @@ BayesSurvive <- function(survObj,
     )
   }
 
-  if (MRF.G) {
+  # if (MRF.G) {
     initial$G.ini <- data.matrix(hyperpar$G)
     if (model.type == "Pooled" && any(dim(initial$G.ini) != c(p, p))) {
       stop("Hyperparameter 'hyperpar$G' has incorrect dimensions!")
@@ -277,7 +283,7 @@ BayesSurvive <- function(survObj,
     if (model.type != "Pooled" && any(dim(initial$G.ini) != c(p * S, p * S))) {
       stop("Hyperparameter 'hyperpar$G' has incorrect dimensions!")
     }
-  }
+  # }
 
   ret <- list(input = list(), output = list(), call = cl)
   class(ret) <- "BayesSurvive"
@@ -297,7 +303,7 @@ BayesSurvive <- function(survObj,
   ret$output <- func_MCMC(
     survObj = survObj,
     hyperpar = hyperpar,
-    initial = initial,
+    ini = initial,
     nIter = nIter,
     burnin = burnin,
     thin = thin,
@@ -306,7 +312,8 @@ BayesSurvive <- function(survObj,
     MRF_2b = MRF2b,
     MRF_G = MRF.G,
     output_graph_para,
-    verbose
+    verbose,
+    cpp
   )
 
   if (S == 1 && MRF.G) {

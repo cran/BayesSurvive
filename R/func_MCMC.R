@@ -11,7 +11,7 @@
 #' @param survObj a list containing observed data from \code{n} subjects;
 #' \code{t}, \code{di}, \code{X}. See details for more information
 #' @param hyperpar a list containing prior parameter values
-#' @param initial a list containing prior parameters' initial values
+#' @param ini a list containing prior parameters' initial values
 #' @param nIter the number of iterations of the chain
 #' @param burnin number of iterations to discard at the start of the chain.
 #' Default is 0
@@ -22,11 +22,12 @@
 #' @param MRF_2b two different b in MRF prior for subgraphs G_ss and G_rs
 #' @param MRF_G logical value. \code{MRF_G = TRUE} is to fix the MRF graph which
 #' is provided in the argument \code{hyperpar}, and \code{MRF_G = FALSE} is to
-#' use graphical model for leanring the MRF graph
+#' use graphical model for learning the MRF graph
 #' @param output_graph_para allow (\code{TRUE}) or suppress (\code{FALSE}) the
 #' output for parameters 'G', 'V', 'C' and 'Sig' in the graphical model
 #' if \code{MRF_G = FALSE}
-#' @param verbose logical value to display the progess of MCMC
+#' @param verbose logical value to display the progress of MCMC
+#' @inheritParams BayesSurvive
 #'
 #' @return A list object saving the MCMC results with components including
 #' 'gamma.p', 'beta.p', 'h.p', 'gamma.margin', 'beta.margin', 's', 'eta0',
@@ -35,10 +36,10 @@
 #'
 #'
 #' @export
-func_MCMC <- function(survObj, hyperpar, initial,
+func_MCMC <- function(survObj, hyperpar, ini,
                       nIter, thin, burnin,
                       S, method, MRF_2b, MRF_G,
-                      output_graph_para, verbose) {
+                      output_graph_para, verbose, cpp = FALSE) {
   # prior parameters for grouped data likelihood of Cox model
   if (method == "Pooled" && MRF_G) { # method = "Pooled"
     hyperpar$s <- sort(survObj$t[survObj$di == 1])
@@ -97,7 +98,7 @@ func_MCMC <- function(survObj, hyperpar, initial,
     h <- lapply(hyperpar$J, function(x) rgamma(x, 1, 1))
   }
 
-  ini <- initial
+  #ini <- initial
   ini$h <- h
 
   # for posterior samples
@@ -155,15 +156,17 @@ func_MCMC <- function(survObj, hyperpar, initial,
   # MCMC sampling
 
   # Initializes the progress bar
-  if (verbose) cat("  Running MCMC iterations ...\n")
-  pb <- txtProgressBar(min = 0, max = nIter, style = 3, width = 50, char = "=")
+  if (verbose) {
+    cat("  Running MCMC iterations ...\n")
+    pb <- txtProgressBar(min = 0, max = nIter, style = 3, width = 50, char = "=")
+  }
 
   for (M in 1:nIter) {
     # if (method %in% c("CoxBVSSL", "Sub-struct") ||
     #     (method == "Pooled" && !MRF_G)) {
     if (!MRF_G) {
       # update graph and precision matrix
-      network <- func_MCMC_graph(survObj, hyperpar, ini, S, method, MRF_2b)
+      network <- func_MCMC_graph(survObj, hyperpar, ini, S, method, MRF_2b, cpp)
 
       Sig.ini <- ini$Sig.ini <- network$Sig.ini # precision matrix?
       C.ini <- ini$C.ini <- network$C.ini
@@ -174,12 +177,41 @@ func_MCMC <- function(survObj, hyperpar, initial,
 
     # update gamma (latent indicators of variable selection)
     # browser()
-    sampleGam <- UpdateGamma(survObj, hyperpar, ini, S, method, MRF_G, MRF_2b)
+    sampleGam <- UpdateGamma(survObj, hyperpar, ini, S, method, MRF_G, MRF_2b, cpp)
+    
+    if (is(sampleGam$gamma.ini, "matrix")) {
+      if (S > 1) {
+        # TEMP Workaround because C++ outputs list elements as matrices and UpdateRPlee11 expects lists (until it's translated)
+        # sampleGam <- lapply(sampleGam, function(x) apply(x, 1, list))
+        if (!(method == "Pooled" && MRF_G)) {
+          # sampleGam <- lapply(sampleGam, function(x) lapply(x, unlist))
+          sampleGam <- lapply(sampleGam, function(x) lapply(seq_len(ncol(x)), function(g) x[,g]))
+        } else {
+          sampleGam <- lapply(sampleGam, unlist)
+        }
+      } else {
+        if (!MRF_G) {
+          sampleGam$beta.ini <- list(sampleGam$beta.ini)
+          sampleGam$gamma.ini <- list(sampleGam$gamma.ini)
+        }
+      }
+    }
     gamma.ini <- ini$gamma.ini <- sampleGam$gamma.ini
 
     # update beta (regression parameters)
-    # beta.tmp  = UpdateRP.lee11(survObj, hyperpar, ini, S, method)
-    beta.tmp <- UpdateRPlee11(survObj, hyperpar, ini, S, method, MRF_G)
+    beta.tmp <- UpdateRPlee11(survObj, hyperpar, ini, S, method, MRF_G, cpp)
+    if (cpp) {
+      # TEMP workaround because C++ outputs list elements as matrices and BayesSurvive_wrap expects something else
+      # Converts list elements to vectors if necessary
+      if (any(vapply(hyperpar, function(x) is(x, "list"), logical(1)))) {
+        beta.tmp$beta.ini <- lapply(
+          seq_len(S), function(x) as.vector(beta.tmp$beta.ini[, x])
+        )
+      } else {
+        beta.tmp$beta.ini <- as.vector(beta.tmp$beta.ini)
+      }
+    }
+
     beta.ini <- ini$beta.ini <- beta.tmp$beta.ini
 
     # update increments in cumulative hazards
@@ -221,7 +253,12 @@ func_MCMC <- function(survObj, hyperpar, initial,
         # RW.accept <- rbind(RW.accept, as.vector(beta.tmp$acceptlee))
       } else {
         for (g in 1:S) {
-          RW.accept[[g]] <- rbind(RW.accept[[g]], beta.tmp$acceptlee[[g]])
+          # browser()
+          if (MRF_G) {
+            RW.accept[[g]] <- rbind(RW.accept[[g]], beta.tmp$acceptlee[[g]])
+          } else {
+            RW.accept[[g]] <- rbind(RW.accept[[g]], beta.tmp$acceptlee[, g])
+          }
         }
       }
       mcmcOutcome$accept.RW <- RW.accept
@@ -251,19 +288,19 @@ func_MCMC <- function(survObj, hyperpar, initial,
       }
 
       if (method == "Pooled" && MRF_G) {
-        mcmcOutcome$gamma.p <- rbind(mcmcOutcome$gamma.p, gamma.ini, deparse.level = 0)
-        mcmcOutcome$post.gamma <- rbind(mcmcOutcome$post.gamma, sampleGam$post.gamma, deparse.level = 0)
-        mcmcOutcome$beta.p <- rbind(mcmcOutcome$beta.p, beta.ini, deparse.level = 0)
+        mcmcOutcome$gamma.p <- rbind(mcmcOutcome$gamma.p, as.vector(gamma.ini), deparse.level = 0)
+        mcmcOutcome$post.gamma <- rbind(mcmcOutcome$post.gamma, as.vector(sampleGam$post.gamma), deparse.level = 0)
+        mcmcOutcome$beta.p <- rbind(mcmcOutcome$beta.p, as.vector(beta.ini), deparse.level = 0)
         mcmcOutcome$h.p <- rbind(mcmcOutcome$h.p, h, deparse.level = 0)
       } else {
         for (g in 1:S) {
           # browser()
           mcmcOutcome$gamma.p[[g]] <- rbind(mcmcOutcome$gamma.p[[g]],
-            (gamma.ini)[[g]],
+            as.vector(gamma.ini[[g]]),
             deparse.level = 0
           )
           mcmcOutcome$post.gamma[[g]] <- rbind(mcmcOutcome$post.gamma[[g]],
-            sampleGam$post.gamma[[g]],
+            as.vector(sampleGam$post.gamma[[g]]),
             deparse.level = 0
           )
           mcmcOutcome$beta.p[[g]] <- rbind(mcmcOutcome$beta.p[[g]],
@@ -283,9 +320,9 @@ func_MCMC <- function(survObj, hyperpar, initial,
     # }
 
     # Sets the progress bar to the current state
-    setTxtProgressBar(pb, M)
+    if (verbose) setTxtProgressBar(pb, M)
   } # the end of MCMC sampling
-  close(pb) # Close the connection of progress bar
+  if (verbose) close(pb) # Close the connection of progress bar
 
   if (S == 1 && MRF_G) {
     mcmcOutcome$gamma.margin <- mcmcOutcome$gamma.margin / (nIter - burnin)

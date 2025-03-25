@@ -16,18 +16,22 @@
 #' \code{c("Pooled", "CoxBVSSL", "Sub-struct", "Subgroup")}
 #' @param MRF_G logical value. \code{MRF_G = TRUE} is to fix the MRF graph which
 #' is provided in the argument \code{hyperpar}, and \code{MRF_G = FALSE} is to
-#' use graphical model for leanring the MRF graph
+#' use graphical model for learning the MRF graph
 #' @param MRF_2b two different b in MRF prior for subgraphs G_ss and G_rs
+#' @inheritParams func_MCMC
 #'
 #' @return A list object with two components for the latent variable selection
 #' indicators gamma with either independent Bernoulli prior
 # (standard approaches) or with MRF prior
 #'
 #' @export
-UpdateGamma <- function(sobj, hyperpar, ini, S, method, MRF_G, MRF_2b) {
+UpdateGamma <- function(sobj, hyperpar, ini, S, method, MRF_G, MRF_2b, cpp = FALSE) {
   # Update latent variable selection indicators gamma with either independent Bernoulli prior
   # (standard approaches) or with MRF prior.
-
+  # browser()
+  if (cpp) {
+    return(UpdateGamma_cpp(sobj, hyperpar, ini, S, method, MRF_G, MRF_2b))
+  }
   p <- sobj$p
   tau <- hyperpar$tau
   cb <- hyperpar$cb
@@ -183,7 +187,7 @@ calJpost <- function(sobj, hyperpar, ini, S, method, MRF_G, MRF_2b) {
     cbtau <- tau * ifelse(gamma.ini == 1, cb, 1)
 
     # erg <- calJpost.helper(cbtau, X, beta.ini, h, hPriorSh, c0, n, p, J, ind.r_d, ind.d)
-    erg <- calJpost_helper_cpp(cbtau, X, beta.ini, h, hPriorSh, c0, J, ind.r_d, ind.d)
+    erg <- calJpost_helper_cpp(cbtau, X, beta.ini, h, hPriorSh, c0, ind.r_d, ind.d)
     loglike <- erg$loglike1
     logpriorBeta <- erg$logpriorBeta1
     logpriorH <- erg$logpriorH1
@@ -208,7 +212,7 @@ calJpost <- function(sobj, hyperpar, ini, S, method, MRF_G, MRF_2b) {
       cbtau <- tau * ifelse(gamma.ini == 1, cb, 1)
 
       # erg <- calJpost.helper(cbtau, X, beta.ini, h, hPriorSh, c0, n, p, J, ind.r_d, ind.d)
-      erg <- calJpost_helper_cpp(cbtau, X, beta.ini, h, hPriorSh, c0, J, ind.r_d, ind.d)
+      erg <- calJpost_helper_cpp(cbtau, X, beta.ini, h, hPriorSh, c0, ind.r_d, ind.d)
       loglike[g] <- erg$loglike1
       logpriorBeta[g] <- erg$logpriorBeta1
       logpriorH[g] <- erg$logpriorH1

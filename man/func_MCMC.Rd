@@ -7,7 +7,7 @@
 func_MCMC(
   survObj,
   hyperpar,
-  initial,
+  ini,
   nIter,
   thin,
   burnin,
@@ -16,7 +16,8 @@ func_MCMC(
   MRF_2b,
   MRF_G,
   output_graph_para,
-  verbose
+  verbose,
+  cpp = FALSE
 )
 }
 \arguments{
@@ -25,7 +26,7 @@ func_MCMC(
 
 \item{hyperpar}{a list containing prior parameter values}
 
-\item{initial}{a list containing prior parameters' initial values}
+\item{ini}{a list containing prior parameters' initial values}
 
 \item{nIter}{the number of iterations of the chain}
 
@@ -43,13 +44,15 @@ Default is 0}
 
 \item{MRF_G}{logical value. \code{MRF_G = TRUE} is to fix the MRF graph which
 is provided in the argument \code{hyperpar}, and \code{MRF_G = FALSE} is to
-use graphical model for leanring the MRF graph}
+use graphical model for learning the MRF graph}
 
 \item{output_graph_para}{allow (\code{TRUE}) or suppress (\code{FALSE}) the
 output for parameters 'G', 'V', 'C' and 'Sig' in the graphical model
 if \code{MRF_G = FALSE}}
 
-\item{verbose}{logical value to display the progess of MCMC}
+\item{verbose}{logical value to display the progress of MCMC}
+
+\item{cpp}{logical, whether to use C++ code for faster computation}
 }
 \value{
 A list object saving the MCMC results with components including
